@@ -1,21 +1,21 @@
 // Package domain holds the Todo bounded context's business model.
 //
-// THE ONE RULE: this package imports ONLY the standard library.
-// No pgx. No net/http. No encoding/json. If you ever feel the urge to add
-// a `json:"..."` tag to a struct in here, that is the design telling you
-// the transport layer needs its own DTO instead.
+// THE ONE RULE: this package imports only the standard library (plus a UUID
+// generator, which is identity, not infrastructure). No pgx. No net/http. No
+// encoding/json. If you ever want to put a `json:"..."` tag on a struct in
+// here, that is the design telling you the transport layer needs its own DTO.
 package domain
 
 import "time"
 
 // Todo is the aggregate root of this context.
 //
-// Note the lowercase fields: they are private to this package. Nothing
-// outside domain/ can do `t.completed = true` and skip the business rules.
-// This is Go's encapsulation unit -- the package, not the struct.
+// Every field is lowercase, so they are private to this package. Nothing
+// outside domain/ can write `t.completed = true` and skip the rules. This is
+// Go's encapsulation unit -- the package, not the struct.
 //
-// Coming from FastAPI: this is NOT your SQLModel class and NOT your Pydantic
-// schema. It is a third, separate thing that knows only about todo-ness.
+// Coming from FastAPI: this is NOT a SQLModel class and NOT a Pydantic schema.
+// It is a third, separate thing that knows only about todo-ness.
 type Todo struct {
 	id          ID
 	title       Title
@@ -27,26 +27,53 @@ type Todo struct {
 }
 
 // ---------------------------------------------------------------------------
-// Constructors
+// TIME
+//
+// Every method that reads or writes a timestamp takes `now` as a parameter.
+// Nothing in this package calls time.Now() (docs/DECISIONS.md #6).
+//
+// The service calls time.Now() once per request and threads it down. Three
+// things fall out of that:
+//   - the domain is a pure function of its inputs, so tests state the instant
+//     they mean rather than sleeping or freezing a clock
+//   - every todo in a list is judged against the SAME instant
+//   - "a failed transition must not move updatedAt" becomes an exact
+//     assertion rather than a timing-dependent one
+//
+// All stored times are normalised to UTC on the way in. Postgres TIMESTAMPTZ
+// stores UTC regardless, so normalising here means the value a test sees and
+// the value the database returns are the same value.
 // ---------------------------------------------------------------------------
 
-// New creates a valid Todo or fails. There is deliberately no other way to
-// build one from outside this package, so an invalid Todo cannot exist.
+// New creates a valid Todo. There is deliberately no other way to build one
+// from outside this package, so an invalid Todo cannot exist.
 //
-// TODO(you): construct the Todo, set timestamps, return it.
-func New(title Title, description string, dueDate *time.Time) (*Todo, error) {
-	return nil, nil // TODO
+// A due date in the past is accepted -- see errors.go for why.
+func New(title Title, description string, dueDate *time.Time, now time.Time) (*Todo, error) {
+	if title.value == "" {
+		return nil, ErrTitleEmpty
+	}
+
+	ts := now.UTC()
+	t := &Todo{
+		id:          NewID(),
+		title:       title,
+		description: description,
+		completed:   false,
+		createdAt:   ts,
+		updatedAt:   ts,
+	}
+	t.setDueDate(dueDate)
+	return t, nil
 }
 
 // Reconstitute rebuilds a Todo from stored state.
 //
-// Why this exists: New() applies creation rules (fresh ID, createdAt = now).
-// The Postgres repository is loading a row that ALREADY passed those rules
-// years ago -- it must not re-run them. This is the standard DDD escape hatch
-// for the persistence layer, and it is why the repository can live outside
+// Why this exists: New applies CREATION rules -- it mints a fresh ID and sets
+// createdAt to now. The repository is loading a row that already passed those
+// rules, possibly years ago, and must not re-run them. This is the standard DDD
+// escape hatch for persistence, and it is what lets the repository live outside
 // this package without needing access to private fields.
-//
-// TODO(you): populate every field verbatim from the arguments.
 func Reconstitute(
 	id ID,
 	title Title,
@@ -55,116 +82,151 @@ func Reconstitute(
 	dueDate *time.Time,
 	createdAt, updatedAt time.Time,
 ) *Todo {
-	return nil // TODO
+	t := &Todo{
+		id:          id,
+		title:       title,
+		description: description,
+		completed:   completed,
+		createdAt:   createdAt.UTC(),
+		updatedAt:   updatedAt.UTC(),
+	}
+	t.setDueDate(dueDate)
+	return t
 }
 
 // ---------------------------------------------------------------------------
-// Behaviour -- the business rules live HERE, not in the service, not in the handler
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // STATE MACHINE
-//
-// A Todo has exactly two states and two legal transitions:
 //
 //	        Complete()                  Reopen()
 //	 ACTIVE ──────────▶ COMPLETED   COMPLETED ──────────▶ ACTIVE
 //	 (completed=false)  (=true)      (=true)              (=false)
 //
 // Both transitions are STRICT: calling one from the wrong state is an error,
-// not a silent no-op. Decided deliberately -- see docs/DECISIONS.md #1.
-//
-// Consequences that ripple outward, all of them already in place:
-//   - api/openapi.yaml promises 409 on both endpoints
-//   - http/errors.go maps ErrAlreadyComplete / ErrNotCompleted to 409
-//   - app/service.go must let those errors propagate UNWRAPPED, or errors.Is
-//     stops matching and the client silently starts receiving 500s
+// not a silent no-op (docs/DECISIONS.md #1). On the error path NOTHING changes,
+// updatedAt included -- a failed transition that still bumped a timestamp would
+// be a partial mutation, and preventing those is what an aggregate is for.
 // ---------------------------------------------------------------------------
 
-// Complete transitions the todo from ACTIVE to COMPLETED.
+// Complete transitions ACTIVE -> COMPLETED.
 //
-// Contract:
-//
-//	Precondition   t.completed == false
-//	Postcondition  t.completed == true, t.updatedAt refreshed
-//	Error          ErrAlreadyComplete if already completed
-//
-// On the error path NOTHING may change -- not completed, and not updatedAt.
-// A failed transition that still bumped a timestamp would be a partial
-// mutation, and the aggregate's job is to make those impossible.
-//
-// Note the due date is irrelevant here. An overdue todo can still be completed;
-// lateness is an observation about time, never a permission check.
-//
-// TODO(you): implement to this contract.
-func (t *Todo) Complete() error {
-	return nil // TODO
+// The due date is irrelevant here: an overdue todo can still be completed.
+// Lateness is an observation about time, never a permission check.
+func (t *Todo) Complete(now time.Time) error {
+	if t.completed {
+		return ErrAlreadyComplete
+	}
+	t.completed = true
+	t.touch(now)
+	return nil
 }
 
-// Reopen transitions the todo from COMPLETED back to ACTIVE.
+// Reopen transitions COMPLETED -> ACTIVE. The exact mirror of Complete.
 //
-// Contract -- the exact mirror of Complete:
-//
-//	Precondition   t.completed == true
-//	Postcondition  t.completed == false, t.updatedAt refreshed
-//	Error          ErrNotCompleted if it was never completed
-//
-// The mirroring matters. If Complete is strict and Reopen is forgiving, the two
-// halves of the state machine disagree, and which half a bug lands in becomes
-// a coin flip.
-//
-// Deliberately NOT part of this contract: reopening does not touch dueDate. A
-// todo reopened after its deadline is immediately overdue again, which is
-// truthful. Clearing the date to be kind would be the domain quietly inventing
-// a rule nobody asked for -- if rescheduling is wanted, the caller calls
-// Reschedule, visibly.
-//
-// TODO(you): implement to this contract.
-func (t *Todo) Reopen() error {
-	return nil // TODO
+// Deliberately does not touch dueDate. A todo reopened after its deadline is
+// immediately overdue again, which is truthful. Clearing the date to be kind
+// would be the domain inventing a rule nobody asked for -- Reschedule exists
+// for that, visibly.
+func (t *Todo) Reopen(now time.Time) error {
+	if !t.completed {
+		return ErrNotCompleted
+	}
+	t.completed = false
+	t.touch(now)
+	return nil
 }
 
-// UpdateTitle replaces the title. Takes a Title (already-validated value
-// object), not a string -- so this method cannot receive garbage.
+// ---------------------------------------------------------------------------
+// Mutators
 //
-// TODO(you): assign and touch updatedAt.
-func (t *Todo) UpdateTitle(title Title) error {
-	return nil // TODO
+// These return an error they currently never produce. That is a deliberate
+// choice for the aggregate's mutating API: adding a rule later (say, a
+// completed todo may not be renamed) then costs no caller a signature change.
+// Elsewhere in Go, returning an error you cannot produce is noise -- here the
+// uniformity across an aggregate's methods is worth more.
+// ---------------------------------------------------------------------------
+
+// UpdateTitle replaces the title. Takes an already-validated Title, so this
+// method cannot receive garbage.
+func (t *Todo) UpdateTitle(title Title, now time.Time) error {
+	if title.Equals(t.title) {
+		return nil // no change, so no timestamp bump
+	}
+	t.title = title
+	t.touch(now)
+	return nil
 }
 
 // UpdateDescription replaces the free-text description.
-//
-// TODO(you)
-func (t *Todo) UpdateDescription(description string) error {
-	return nil // TODO
+func (t *Todo) UpdateDescription(description string, now time.Time) error {
+	if description == t.description {
+		return nil
+	}
+	t.description = description
+	t.touch(now)
+	return nil
 }
 
 // Reschedule changes or clears the due date. Pass nil to clear it.
-//
-// TODO(you): consider whether a due date in the past should be rejected.
-func (t *Todo) Reschedule(dueDate *time.Time) error {
-	return nil // TODO
+func (t *Todo) Reschedule(dueDate *time.Time, now time.Time) error {
+	t.setDueDate(dueDate)
+	t.touch(now)
+	return nil
 }
 
-// IsOverdue is a derived property -- computed, never stored.
+// IsOverdue reports whether this todo needs attention as of `now`.
 //
-// TODO(you)
+// A COMPLETED todo is never overdue (docs/DECISIONS.md #7). "Overdue" here
+// means outstanding and past its deadline, so ?overdue=true returns exactly the
+// list a user should act on, with no client-side filtering.
 func (t *Todo) IsOverdue(now time.Time) bool {
-	return false // TODO
+	if t.completed || t.dueDate == nil {
+		return false
+	}
+	return now.UTC().After(*t.dueDate)
 }
 
 // ---------------------------------------------------------------------------
 // Getters
 //
-// Go has no `public readonly` and no @property. Private field + exported
-// getter method is the whole mechanism. Verbose, but it means the outside
-// world can read state and cannot write it.
+// Go has no `public readonly` and no @property. Private field plus exported
+// getter is the whole mechanism: the outside world can read state and cannot
+// write it.
 // ---------------------------------------------------------------------------
 
-func (t *Todo) ID() ID                { return t.id }
-func (t *Todo) Title() Title          { return t.title }
-func (t *Todo) Description() string   { return t.description }
-func (t *Todo) IsCompleted() bool     { return t.completed }
-func (t *Todo) DueDate() *time.Time   { return t.dueDate }
-func (t *Todo) CreatedAt() time.Time  { return t.createdAt }
-func (t *Todo) UpdatedAt() time.Time  { return t.updatedAt }
+func (t *Todo) ID() ID              { return t.id }
+func (t *Todo) Title() Title        { return t.title }
+func (t *Todo) Description() string { return t.description }
+func (t *Todo) IsCompleted() bool   { return t.completed }
+func (t *Todo) CreatedAt() time.Time { return t.createdAt }
+func (t *Todo) UpdatedAt() time.Time { return t.updatedAt }
+
+// DueDate returns a COPY, not the stored pointer.
+//
+// Without the copy a caller could write *todo.DueDate() = someOtherTime and
+// mutate the aggregate from outside, defeating every private field above. This
+// is the pointer-shaped hole in Go's encapsulation, and copying is the patch.
+func (t *Todo) DueDate() *time.Time {
+	if t.dueDate == nil {
+		return nil
+	}
+	d := *t.dueDate
+	return &d
+}
+
+// ---------------------------------------------------------------------------
+// internals
+// ---------------------------------------------------------------------------
+
+// setDueDate stores a normalised COPY of the caller's time, for the same reason
+// DueDate hands one out: a stored pointer the caller still holds is a field the
+// caller can still change.
+func (t *Todo) setDueDate(dueDate *time.Time) {
+	if dueDate == nil {
+		t.dueDate = nil
+		return
+	}
+	d := dueDate.UTC()
+	t.dueDate = &d
+}
+
+func (t *Todo) touch(now time.Time) { t.updatedAt = now.UTC() }

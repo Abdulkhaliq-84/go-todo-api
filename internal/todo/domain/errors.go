@@ -19,5 +19,11 @@ var (
 	ErrInvalidID       = errors.New("invalid todo id")
 	ErrAlreadyComplete = errors.New("todo is already completed")
 	ErrNotCompleted    = errors.New("todo is not completed")
-	ErrDueDateInPast   = errors.New("due date must be in the future")
 )
+
+// Deliberately absent: an ErrDueDateInPast.
+//
+// A due date in the past is allowed, on creation and on reschedule. Logging a
+// task you already missed is a normal thing to do, and importing history would
+// be impossible otherwise. A sentinel error the code never returns is worse
+// than no sentinel at all -- it implies a rule that does not exist.

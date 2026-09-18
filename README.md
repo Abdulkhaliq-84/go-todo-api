@@ -2,9 +2,17 @@
 
 A to-do REST API in Go, structured with Domain-Driven Design and backed by PostgreSQL.
 
-**Status: scaffold.** Every file exists with its types, signatures and
-responsibilities defined. No business logic is implemented — each function
-carries a `TODO(you)` marker explaining what belongs there and why.
+**Status: in progress.** The domain layer is implemented and tested; the
+remaining layers are scaffolded with their contracts written and `TODO`
+markers where the bodies go.
+
+| Layer | State |
+|---|---|
+| `domain` | ✅ implemented, 85% covered, no database needed |
+| `app` | scaffolded |
+| `postgres` | scaffolded |
+| `http` | scaffolded |
+| `platform` + `main.go` | scaffolded |
 
 This document is the plan: what every file is for, and why it sits where it does.
 

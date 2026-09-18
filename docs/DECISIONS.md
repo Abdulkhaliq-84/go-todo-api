@@ -97,7 +97,7 @@ bug that a unique-violation error would not meaningfully mitigate.
 
 ---
 
-## 4. Error → status mapping — mostly settled, confirm the codes
+## 4. Error → status mapping — DECIDED: coarse codes
 
 | Domain error | Status | Code |
 |---|---|---|
@@ -112,9 +112,19 @@ bug that a unique-violation error would not meaningfully mitigate.
 The `error` code is part of the public contract — clients branch on it, so
 renaming one is a breaking change like renaming a JSON field.
 
-Unresolved: whether 400 codes should be finer-grained (`title_too_long` vs
-`invalid_title`). Finer is friendlier to clients; coarser is fewer things to
-keep stable forever.
+**Coarse chosen.** `invalid_title` covers both the empty and the too-long case;
+the `message` carries the specifics for a human. Fewer strings frozen into the
+contract forever, at the cost of a client not being able to distinguish the two
+title failures without reading prose.
+
+Rejected: one code per domain error (more client-friendly, permanently larger
+contract surface), and adding a `field` to `ErrorResponse` (two things to keep
+in sync instead of one).
+
+Note `ErrDueDateInPast` was **removed** rather than mapped. A past due date is
+allowed — logging a task you already missed is normal, and importing history
+would be impossible otherwise. A sentinel the code never returns implies a rule
+that does not exist.
 
 ---
 
@@ -153,9 +163,28 @@ midnight or only in CI.
 
 ---
 
-## Still open
+---
 
-**Does a completed todo stay "overdue"?** If a todo was due yesterday and you
-finished it today, should `IsOverdue` keep reporting true? Independent of the
-completion rules — the due date never gated `Complete()`. This only decides what
-the flag reports afterwards.
+## 7. Does a completed todo stay overdue? — DECIDED: no
+
+`IsOverdue` returns `false` once a todo is completed, however late it was
+finished.
+
+"Overdue" means **needs attention**, and a finished task needs none. The
+practical consequence is that `?overdue=true` returns exactly the list a user
+should act on, with no client-side filtering — and no client can forget to
+apply it.
+
+**Trade accepted:** lateness becomes unrecoverable from the API. Nothing records
+that a task was finished after its deadline.
+
+**Rejected:** a pure date comparison (purest domain, but every client repeats
+`overdue && !completed` and one will forget), and carrying both `overdue` and
+`completed_late` (most expressive, but a new field across four files for a
+feature nobody has asked for).
+
+---
+
+## All seven settled
+
+Nothing is blocking implementation.
