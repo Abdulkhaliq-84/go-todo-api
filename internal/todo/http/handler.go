@@ -1,21 +1,22 @@
 // Package http adapts HTTP to the application layer.
 //
 // Its entire job is translation, in both directions:
-//   inbound:  a parsed request object  ->  app commands/queries
-//   outbound: app DTOs or errors       ->  typed response objects
 //
-// It imports app. It must NOT import postgres, and it must not contain business
+//	inbound:  a parsed request object  ->  app commands/queries
+//	outbound: app DTOs or errors       ->  typed response objects
+//
+// It imports app. It must NOT import postgres, and it must contain no business
 // rules -- those live in the domain.
 //
-// THE SHAPE OF THIS FILE IS DICTATED BY api/openapi.yaml.
-// openapi_gen.go declares StrictServerInterface; the assertion below makes the
-// compiler check that this type satisfies it. Add an endpoint to the spec,
-// regenerate, and this file stops compiling until you implement it. That is the
-// whole point of spec-first: the contract cannot drift from the code.
+// THE SHAPE OF THIS FILE IS DICTATED BY api/openapi.yaml. openapi_gen.go
+// declares StrictServerInterface; the assertion below makes the compiler check
+// that this type satisfies it. Add an endpoint to the spec, regenerate, and
+// this file stops compiling until it is implemented.
 package http
 
 import (
 	"context"
+	nethttp "net/http"
 
 	"github.com/Abdulkhaliq-84/go-todo-api/internal/todo/app"
 )
@@ -26,7 +27,6 @@ import (
 // package-level func Handler(ServerInterface) http.Handler.
 //
 // Dependency injection is the struct field -- no container, no decorators.
-// Wiring happens once, by hand, in cmd/api/main.go.
 type Server struct {
 	service *app.Service
 }
@@ -35,91 +35,163 @@ func NewServer(service *app.Service) *Server {
 	return &Server{service: service}
 }
 
-// Compile-time contract check. This single line is what turns a spec change
-// into a build failure instead of a runtime surprise.
 var _ StrictServerInterface = (*Server)(nil)
 
 // ---------------------------------------------------------------------------
 // Endpoints
 //
-// Note the signature style: you receive a PARSED, TYPED request and RETURN a
-// typed response. No ResponseWriter, no forgetting to return after writing an
-// error. Much closer to an Express handler doing `return res.json(...)`, and it
-// makes every handler a pure function you can call directly in a test.
+// Signature style: receive a PARSED, TYPED request and RETURN a typed response.
+// No ResponseWriter, so forgetting to return after writing an error is not
+// possible. Much closer to `return res.json(...)` than Go usually gets, and it
+// makes each handler a pure function a test can call directly.
 //
-// Path params, query params and the decoded JSON body all arrive already
-// parsed and validated against the spec -- that part is genuinely FastAPI-like,
-// and it is generated rather than reflected at runtime.
+// Error handling follows one rule everywhere: ask classify() what this error
+// means. If it maps to a status this endpoint documents, return that typed
+// response; if it is internal, return it as an `error` so the strict runtime
+// logs it and answers a generic 500 (see router.go).
 // ---------------------------------------------------------------------------
 
 // ListTodos handles GET /api/v1/todos
-//
-// TODO(you): build an app.ListTodosQuery from request.Params (all pointers --
-// nil means the client omitted it, so apply your defaults), call the service,
-// return ListTodos200JSONResponse{Data: ..., Count: ...}.
 func (s *Server) ListTodos(ctx context.Context, request ListTodosRequestObject) (ListTodosResponseObject, error) {
-	return nil, nil // TODO
+	dtos, err := s.service.List(ctx, toListQuery(request.Params))
+	if err != nil {
+		if isInternal(err) {
+			return nil, err
+		}
+		_, body := classify(err)
+		return ListTodos400JSONResponse{BadRequestJSONResponse(body)}, nil
+	}
+
+	todos := toTodos(dtos)
+	return ListTodos200JSONResponse{Data: todos, Count: len(todos)}, nil
 }
 
 // CreateTodo handles POST /api/v1/todos
 //
-// request.Body is already decoded into *CreateTodoRequest and checked against
-// the spec's constraints. What it has NOT been checked against is your domain
-// rules -- those still run in domain.NewTitle. Two layers of validation with
-// different jobs: shape here, meaning there.
-//
-// TODO(you): map body -> app.CreateTodoCommand, call Create, return
-// CreateTodo201JSONResponse(toTodo(dto)).
+// request.Body is already decoded and checked against the spec's constraints.
+// What it has NOT been checked against is the domain rules -- those still run
+// in domain.NewTitle, reached through the service. Two layers of validation
+// with different jobs: shape here, meaning there.
 func (s *Server) CreateTodo(ctx context.Context, request CreateTodoRequestObject) (CreateTodoResponseObject, error) {
-	return nil, nil // TODO
+	if request.Body == nil {
+		return CreateTodo400JSONResponse{BadRequestJSONResponse{
+			Error:   codeInvalidTitle,
+			Message: "a request body is required",
+		}}, nil
+	}
+
+	dto, err := s.service.Create(ctx, toCreateCommand(*request.Body))
+	if err != nil {
+		if isInternal(err) {
+			return nil, err
+		}
+		_, body := classify(err)
+		return CreateTodo400JSONResponse{BadRequestJSONResponse(body)}, nil
+	}
+	return CreateTodo201JSONResponse(toTodo(dto)), nil
 }
 
 // GetTodoById handles GET /api/v1/todos/{id}
 //
-// TODO(you): request.Id is already a parsed UUID. On domain.ErrNotFound return
-// GetTodoById404JSONResponse -- returning the error instead would produce a 500.
+// request.Id is already a parsed UUID -- the generated code rejected anything
+// else before this method ran.
 func (s *Server) GetTodoById(ctx context.Context, request GetTodoByIdRequestObject) (GetTodoByIdResponseObject, error) {
-	return nil, nil // TODO
+	dto, err := s.service.GetByID(ctx, request.Id.String())
+	if err != nil {
+		if isInternal(err) {
+			return nil, err
+		}
+		status, body := classify(err)
+		if status == nethttp.StatusNotFound {
+			return GetTodoById404JSONResponse{NotFoundJSONResponse(body)}, nil
+		}
+		return GetTodoById400JSONResponse{BadRequestJSONResponse(body)}, nil
+	}
+	return GetTodoById200JSONResponse(toTodo(dto)), nil
 }
 
 // UpdateTodo handles PATCH /api/v1/todos/{id}
-//
-// TODO(you)
 func (s *Server) UpdateTodo(ctx context.Context, request UpdateTodoRequestObject) (UpdateTodoResponseObject, error) {
-	return nil, nil // TODO
+	if request.Body == nil {
+		return UpdateTodo400JSONResponse{BadRequestJSONResponse{
+			Error:   codeInvalidTitle,
+			Message: "a request body is required",
+		}}, nil
+	}
+
+	dto, err := s.service.Update(ctx, request.Id.String(), toUpdateCommand(*request.Body))
+	if err != nil {
+		if isInternal(err) {
+			return nil, err
+		}
+		status, body := classify(err)
+		if status == nethttp.StatusNotFound {
+			return UpdateTodo404JSONResponse{NotFoundJSONResponse(body)}, nil
+		}
+		return UpdateTodo400JSONResponse{BadRequestJSONResponse(body)}, nil
+	}
+	return UpdateTodo200JSONResponse(toTodo(dto)), nil
 }
 
 // DeleteTodo handles DELETE /api/v1/todos/{id}
-//
-// TODO(you): return DeleteTodo204Response{} on success.
 func (s *Server) DeleteTodo(ctx context.Context, request DeleteTodoRequestObject) (DeleteTodoResponseObject, error) {
-	return nil, nil // TODO
+	if err := s.service.Delete(ctx, request.Id.String()); err != nil {
+		if isInternal(err) {
+			return nil, err
+		}
+		status, body := classify(err)
+		if status == nethttp.StatusNotFound {
+			return DeleteTodo404JSONResponse{NotFoundJSONResponse(body)}, nil
+		}
+		return DeleteTodo400JSONResponse{BadRequestJSONResponse(body)}, nil
+	}
+	return DeleteTodo204Response{}, nil
 }
 
 // CompleteTodo handles POST /api/v1/todos/{id}/complete
 //
 // The spec promises a 409 here, and the domain delivers one: Complete on an
 // already-completed todo returns ErrAlreadyComplete. The contract and the
-// domain rule are the same decision, stated twice -- if one ever changes, the
-// other has to change with it.
-//
-// TODO(you)
+// domain rule are the same decision stated twice -- change one and the other
+// has to change with it.
 func (s *Server) CompleteTodo(ctx context.Context, request CompleteTodoRequestObject) (CompleteTodoResponseObject, error) {
-	return nil, nil // TODO
+	dto, err := s.service.Complete(ctx, request.Id.String())
+	if err != nil {
+		if isInternal(err) {
+			return nil, err
+		}
+		status, body := classify(err)
+		if status == nethttp.StatusConflict {
+			return CompleteTodo409JSONResponse{ConflictJSONResponse(body)}, nil
+		}
+		return CompleteTodo404JSONResponse{NotFoundJSONResponse(body)}, nil
+	}
+	return CompleteTodo200JSONResponse(toTodo(dto)), nil
 }
 
 // ReopenTodo handles POST /api/v1/todos/{id}/reopen
-//
-// TODO(you)
 func (s *Server) ReopenTodo(ctx context.Context, request ReopenTodoRequestObject) (ReopenTodoResponseObject, error) {
-	return nil, nil // TODO
+	dto, err := s.service.Reopen(ctx, request.Id.String())
+	if err != nil {
+		if isInternal(err) {
+			return nil, err
+		}
+		status, body := classify(err)
+		if status == nethttp.StatusConflict {
+			return ReopenTodo409JSONResponse{ConflictJSONResponse(body)}, nil
+		}
+		return ReopenTodo404JSONResponse{NotFoundJSONResponse(body)}, nil
+	}
+	return ReopenTodo200JSONResponse(toTodo(dto)), nil
 }
 
 // GetHealth handles GET /health
 //
-// TODO(you): return GetHealth200JSONResponse{Status: "ok"}.
-// Decide whether this should also ping the database -- a health check that
-// reports OK while the DB is unreachable is worse than no health check.
+// Reports that the PROCESS is alive, deliberately without touching the
+// database. A liveness probe that fails on a database blip gets the container
+// killed and restarted, which fixes nothing and turns a brief outage into a
+// crash loop. A readiness probe that does ping the database is a separate
+// endpoint worth adding when there is something to orchestrate.
 func (s *Server) GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error) {
-	return nil, nil // TODO
+	return GetHealth200JSONResponse{Status: "ok"}, nil
 }

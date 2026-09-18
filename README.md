@@ -11,7 +11,7 @@ markers where the bodies go.
 | `domain` | ✅ implemented, 85% covered, no database needed |
 | `app` | ✅ implemented, 85% covered, no database needed |
 | `postgres` | ✅ implemented, 14 integration tests against real Postgres |
-| `http` | scaffolded |
+| `http` | ✅ implemented, 26 tests via `httptest`, no database |
 | `platform` + `main.go` | scaffolded |
 
 This document is the plan: what every file is for, and why it sits where it does.
