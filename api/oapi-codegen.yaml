@@ -1,0 +1,30 @@
+# oapi-codegen configuration. Consumed by `make generate`.
+#
+# What gets generated into internal/todo/http/openapi_gen.go:
+#   models          -- Go structs for every schema in the spec
+#   std-http-server -- a ServerInterface your Handler must satisfy, plus a
+#                      ServeMux wiring function
+#   strict-server   -- typed handler signatures: you receive a parsed request
+#                      struct and RETURN a typed response, instead of writing to
+#                      a ResponseWriter. Much closer to an Express handler that
+#                      returns res.json(...), and it makes handlers testable as
+#                      plain functions.
+#
+# NOTE: this changes the shape of the handlers already scaffolded in handler.go.
+# That is the point -- the generated interface becomes the contract, and the
+# compiler enforces that the code matches the spec.
+
+package: http
+output: ../internal/todo/http/openapi_gen.go
+
+generate:
+  models: true
+  std-http-server: true
+  strict-server: true
+  embedded-spec: false
+
+output-options:
+  # Skip pruning so every schema stays available even before handlers use it.
+  skip-prune: true
+  # Generated code is not yours to edit; the header says so loudly.
+  user-templates: {}

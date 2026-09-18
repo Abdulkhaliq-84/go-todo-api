@@ -1,0 +1,262 @@
+# OpenAPI 3.1 contract for the Todo API.
+#
+# THIS FILE IS THE SOURCE OF TRUTH. Go types and a ServerInterface are generated
+# from it by oapi-codegen (`make generate`). Change an endpoint here, regenerate,
+# and the compiler tells you which handlers no longer match. Same discipline as
+# openapi-typescript on a React client -- pointed at the server instead.
+#
+# It also feeds the Scalar docs UI at /docs, so the documentation cannot drift
+# from the contract: they are the same file.
+
+openapi: 3.1.0
+
+info:
+  title: Todo API
+  version: 1.0.0
+  description: |
+    A to-do REST API built with Domain-Driven Design in Go.
+
+    Completing a todo is modelled as a sub-resource action
+    (`POST /todos/{id}/complete`) rather than a field update, because completion
+    is a domain operation with its own rules -- not an assignment.
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: todos
+    description: Todo management
+  - name: system
+    description: Operational endpoints
+
+paths:
+  /health:
+    get:
+      tags: [system]
+      summary: Liveness probe
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/v1/todos:
+    get:
+      tags: [todos]
+      summary: List todos
+      operationId: listTodos
+      parameters:
+        - name: completed
+          in: query
+          description: Filter by completion state. Omit for all.
+          schema: { type: boolean }
+        - name: overdue
+          in: query
+          description: Filter to todos past their due date.
+          schema: { type: boolean }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        "200":
+          description: A page of todos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoListResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+    post:
+      tags: [todos]
+      summary: Create a todo
+      operationId: createTodo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTodoRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Todo"
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/v1/todos/{id}:
+    parameters:
+      - $ref: "#/components/parameters/TodoId"
+
+    get:
+      tags: [todos]
+      summary: Fetch a todo
+      operationId: getTodoById
+      responses:
+        "200":
+          description: The todo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Todo" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    patch:
+      tags: [todos]
+      summary: Partially update a todo
+      description: |
+        Only the fields present in the body are changed. A field sent as `null`
+        is cleared; a field omitted entirely is left alone.
+      operationId: updateTodo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateTodoRequest" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Todo" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    delete:
+      tags: [todos]
+      summary: Delete a todo
+      operationId: deleteTodo
+      responses:
+        "204": { description: Deleted }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/v1/todos/{id}/complete:
+    parameters:
+      - $ref: "#/components/parameters/TodoId"
+    post:
+      tags: [todos]
+      summary: Mark a todo complete
+      operationId: completeTodo
+      responses:
+        "200":
+          description: Completed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Todo" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /api/v1/todos/{id}/reopen:
+    parameters:
+      - $ref: "#/components/parameters/TodoId"
+    post:
+      tags: [todos]
+      summary: Reopen a completed todo
+      operationId: reopenTodo
+      responses:
+        "200":
+          description: Reopened
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Todo" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+components:
+  parameters:
+    TodoId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+    Todo:
+      type: object
+      required: [id, title, description, completed, overdue, created_at, updated_at]
+      properties:
+        id:          { type: string, format: uuid, readOnly: true }
+        title:       { type: string, minLength: 1, maxLength: 200, examples: ["Learn Go interfaces"] }
+        description: { type: string, examples: ["Focus on implicit satisfaction"] }
+        completed:   { type: boolean }
+        due_date:    { type: [string, "null"], format: date-time }
+        overdue:
+          type: boolean
+          readOnly: true
+          description: Derived from due_date and the current time. Never stored.
+        created_at:  { type: string, format: date-time, readOnly: true }
+        updated_at:  { type: string, format: date-time, readOnly: true }
+
+    CreateTodoRequest:
+      type: object
+      required: [title]
+      properties:
+        title:       { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, default: "" }
+        due_date:    { type: [string, "null"], format: date-time }
+
+    UpdateTodoRequest:
+      type: object
+      description: Every field optional. Omitted means unchanged; null means cleared.
+      properties:
+        title:       { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string }
+        due_date:    { type: [string, "null"], format: date-time }
+
+    TodoListResponse:
+      type: object
+      required: [data, count]
+      properties:
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Todo" }
+        count:
+          type: integer
+          description: Number of items in this page.
+
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Stable machine-readable code. Safe to branch on.
+          examples: ["not_found"]
+        message:
+          type: string
+          description: Human-readable detail. Never contains internal errors.
+          examples: ["todo not found"]
+
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, examples: ["ok"] }
+
+  responses:
+    BadRequest:
+      description: Malformed request or invalid field
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    NotFound:
+      description: No todo with that id
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    Conflict:
+      description: The todo is not in a state that allows this operation
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }

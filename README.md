@@ -21,7 +21,9 @@ internal/
     ├── config/              env loading
     ├── database/            pgx connection pool
     └── server/              http.Server + graceful shutdown
+api/                         openapi.yaml (source of truth) + embed + codegen config
 migrations/                  numbered SQL, run by golang-migrate
+test/e2e/                    end-to-end tests, behind the `e2e` build tag
 ```
 
 ### The dependency rule
@@ -56,9 +58,40 @@ verified on every `go build`.
 | `POST` | `/api/v1/todos/{id}/complete` | Mark done |
 | `POST` | `/api/v1/todos/{id}/reopen` | Mark active |
 | `GET` | `/health` | Liveness |
+| `GET` | `/docs` | Interactive API reference (Scalar) |
+| `GET` | `/openapi.yaml` | The raw contract |
 
 Completion is a sub-resource action, not a `PATCH` field, because completing a
 todo is a domain operation with its own rules — not a field assignment.
+
+## API contract
+
+`api/openapi.yaml` is the **source of truth**, not a description written after
+the fact. `oapi-codegen` generates Go models and a `ServerInterface` from it, so
+a handler that no longer matches the spec is a **compile error** — the same
+discipline `openapi-typescript` gives a React client, applied to the server.
+
+```
+edit api/openapi.yaml  ->  make generate  ->  go build ./...  ->  fix what broke
+```
+
+The same file is embedded in the binary and served at `/openapi.yaml`, and
+rendered as an interactive reference at `/docs`. Spec, docs, and code cannot
+drift apart, because they are one file.
+
+## Testing
+
+| Command | Scope | Needs |
+|---|---|---|
+| `make test-unit` | domain, app, http | nothing |
+| `make test-race` | unit tests + race detector | nothing |
+| `make test-integration` | real repository against Postgres | `make db-up` |
+| `make test-e2e` | whole app, wired | `make db-up` |
+| `make test-cover` | coverage → `coverage.html` | nothing |
+
+Integration and e2e tests sit behind Go build tags (`//go:build integration`),
+so `go test ./...` never touches a database and stays fast enough to run on
+every save. `api/requests.http` holds the same calls for poking at by hand.
 
 ## Getting started
 
@@ -73,6 +106,8 @@ Then:
 ```bash
 cp .env.example .env
 go get github.com/jackc/pgx/v5 github.com/google/uuid
+go get github.com/oapi-codegen/oapi-codegen/v2
+make generate
 go mod tidy
 make db-up
 make migrate-up

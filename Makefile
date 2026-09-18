@@ -1,9 +1,22 @@
-.PHONY: help run build test test-unit test-integration test-e2e test-all test-cover test-race lint fmt vet tidy db-up db-down migrate-up migrate-down
+.PHONY: help generate docs-open validate-spec run build test test-unit test-integration test-e2e test-all test-cover test-race lint fmt vet tidy db-up db-down migrate-up migrate-down
 
 DB_URL ?= postgres://postgres:postgres@localhost:5432/todos?sslmode=disable
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
+
+# --- OpenAPI ----------------------------------------------------------------
+# api/openapi.yaml is the source of truth. Edit it, regenerate, and let the
+# compiler tell you which handlers no longer satisfy the contract.
+
+generate: ## Regenerate Go types + ServerInterface from api/openapi.yaml
+	go generate ./...
+
+validate-spec: ## Lint the OpenAPI document (npx, no install needed)
+	npx --yes @redocly/cli lint api/openapi.yaml
+
+docs-open: ## Open the interactive API reference (requires make run)
+	open http://localhost:8080/docs
 
 run: ## Run the API
 	go run ./cmd/api
