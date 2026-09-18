@@ -12,7 +12,7 @@ markers where the bodies go.
 | `app` | ✅ implemented, 85% covered, no database needed |
 | `postgres` | ✅ implemented, 14 integration tests against real Postgres |
 | `http` | ✅ implemented, 26 tests via `httptest`, no database |
-| `platform` + `main.go` | scaffolded |
+| `platform` + `main.go` | ✅ implemented, server runs — `make run` |
 
 This document is the plan: what every file is for, and why it sits where it does.
 

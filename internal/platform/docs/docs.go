@@ -24,29 +24,29 @@ const ScalarCDN = "https://cdn.jsdelivr.net/npm/@scalar/api-reference"
 //
 //	GET /openapi.yaml  the raw contract -- what a client generator consumes
 //	GET /docs          the interactive reference
-//
-// TODO(you): register both handlers on the mux.
 func RegisterRoutes(mux *http.ServeMux) {
-	// TODO
+	mux.HandleFunc("GET /openapi.yaml", specHandler)
+	mux.HandleFunc("GET /docs", docsHandler)
 }
 
 // specHandler serves the embedded OpenAPI document.
 //
-// TODO(you): write api.Spec with Content-Type application/yaml.
+// Served from the binary rather than from disk, so a deployed container has no
+// file to lose and the spec can never drift from the code that shipped with it.
 func specHandler(w http.ResponseWriter, r *http.Request) {
-	_ = api.Spec // TODO(you): remove this line -- it only keeps the import alive
-	// TODO
+	w.Header().Set("Content-Type", "application/yaml")
+	w.Header().Set("Cache-Control", "no-cache")
+	_, _ = w.Write(api.Spec)
 }
 
 // docsHandler serves the Scalar single-page reference.
 //
 // The whole UI is one script tag pointed at the spec URL -- no build step, no
-// node_modules. Closest thing you have used is swagger-ui-express, except this
-// is nine lines of HTML instead of a dependency.
-//
-// TODO(you): write scalarHTML with Content-Type text/html.
+// node_modules. The closest thing you have used is swagger-ui-express, except
+// this is nine lines of HTML instead of a dependency.
 func docsHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(scalarHTML))
 }
 
 const scalarHTML = `<!doctype html>

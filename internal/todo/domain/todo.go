@@ -193,10 +193,10 @@ func (t *Todo) IsOverdue(now time.Time) bool {
 // write it.
 // ---------------------------------------------------------------------------
 
-func (t *Todo) ID() ID              { return t.id }
-func (t *Todo) Title() Title        { return t.title }
-func (t *Todo) Description() string { return t.description }
-func (t *Todo) IsCompleted() bool   { return t.completed }
+func (t *Todo) ID() ID               { return t.id }
+func (t *Todo) Title() Title         { return t.title }
+func (t *Todo) Description() string  { return t.description }
+func (t *Todo) IsCompleted() bool    { return t.completed }
 func (t *Todo) CreatedAt() time.Time { return t.createdAt }
 func (t *Todo) UpdatedAt() time.Time { return t.updatedAt }
 

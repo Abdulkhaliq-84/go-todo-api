@@ -78,10 +78,10 @@ func TestNew_AcceptsPastDueDate(t *testing.T) {
 
 func TestTodo_Complete(t *testing.T) {
 	tests := []struct {
-		name          string
+		name           string
 		startCompleted bool
-		wantErr       error
-		wantCompleted bool
+		wantErr        error
+		wantCompleted  bool
 	}{
 		{"completing an active todo", false, nil, true},
 		{"completing an already-completed todo", true, domain.ErrAlreadyComplete, true},
