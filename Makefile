@@ -1,4 +1,4 @@
-.PHONY: help generate docs-open validate-spec run build test test-unit test-integration test-e2e test-all test-cover test-race lint fmt vet tidy db-up db-down migrate-up migrate-down
+.PHONY: help generate docs-open validate-spec run build db-local test test-unit test-integration test-e2e test-all test-cover test-race lint fmt vet tidy db-up db-down migrate-up migrate-down
 
 DB_URL ?= postgres://postgres:postgres@localhost:5432/todos?sslmode=disable
 
@@ -33,7 +33,7 @@ test: test-unit ## Alias for test-unit
 test-unit: ## Fast tests: domain, app, http. No database required.
 	go test ./... -v
 
-test-integration: ## Real Postgres required (make db-up first)
+test-integration: ## Real Postgres required (make db-up OR make db-local)
 	go test -tags=integration ./internal/todo/postgres/... -v
 
 test-e2e: ## Whole app against a real database
@@ -60,6 +60,11 @@ tidy: ## Sync go.mod/go.sum with actual imports
 
 lint: ## Run golangci-lint (brew install golangci-lint)
 	golangci-lint run
+
+db-local: ## Create + migrate todos_test on a Postgres already running locally
+	createdb todos_test 2>/dev/null || true
+	psql -q -d todos_test -f migrations/000001_create_todos.up.sql
+	@echo "todos_test ready"
 
 db-up: ## Start Postgres
 	docker compose up -d postgres

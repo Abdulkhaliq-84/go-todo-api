@@ -5,11 +5,23 @@ Setup, commands, and workflows. The structural plan lives in the
 
 ## Prerequisites
 
-Go 1.25+ (1.27.1 installed here), Docker, and `golang-migrate`.
+Go 1.25+ (1.27.1 installed here) and a PostgreSQL to talk to.
+
+**Either** a local Postgres — if `brew services list` shows `postgresql@18`
+running, you already have one:
 
 ```bash
-brew install golang-migrate
+make db-local
 ```
+
+**or** Docker:
+
+```bash
+make db-up && make migrate-up   # needs: brew install golang-migrate
+```
+
+Integration tests default to `postgres://localhost:5432/todos_test`. Point them
+elsewhere with `TEST_DATABASE_URL`.
 
 `~/go/bin` must be on your `PATH` for `go install`-ed tools to resolve:
 

@@ -10,7 +10,7 @@ markers where the bodies go.
 |---|---|
 | `domain` | ✅ implemented, 85% covered, no database needed |
 | `app` | ✅ implemented, 85% covered, no database needed |
-| `postgres` | scaffolded |
+| `postgres` | ✅ implemented, 14 integration tests against real Postgres |
 | `http` | scaffolded |
 | `platform` + `main.go` | scaffolded |
 
