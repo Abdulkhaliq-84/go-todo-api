@@ -186,17 +186,19 @@ components:
       type: object
       required: [id, title, description, completed, overdue, created_at, updated_at]
       properties:
-        id:          { type: string, format: uuid, readOnly: true }
+        # No `readOnly` on this schema: Todo is only ever a RESPONSE. Marking
+        # fields readOnly would make the generator emit optional pointers even
+        # for required fields, since one Go type serves both directions.
+        id:          { type: string, format: uuid }
         title:       { type: string, minLength: 1, maxLength: 200, examples: ["Learn Go interfaces"] }
         description: { type: string, examples: ["Focus on implicit satisfaction"] }
         completed:   { type: boolean }
         due_date:    { type: [string, "null"], format: date-time }
         overdue:
           type: boolean
-          readOnly: true
           description: Derived from due_date and the current time. Never stored.
-        created_at:  { type: string, format: date-time, readOnly: true }
-        updated_at:  { type: string, format: date-time, readOnly: true }
+        created_at:  { type: string, format: date-time }
+        updated_at:  { type: string, format: date-time }
 
     CreateTodoRequest:
       type: object

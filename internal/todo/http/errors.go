@@ -7,30 +7,42 @@ import (
 	"github.com/Abdulkhaliq-84/go-todo-api/internal/todo/domain"
 )
 
-// This file is the ONLY place in the codebase that knows both domain errors
-// and HTTP status codes. Concentrating the mapping here is what lets the domain
-// stay transport-agnostic -- swap in a gRPC layer tomorrow and you write a new
-// version of this one file, and change nothing else.
+// This file is the ONLY place in the codebase that knows both domain errors and
+// HTTP status codes. Concentrating the mapping here is what lets the domain
+// stay transport-agnostic -- swap in gRPC tomorrow and you rewrite this one
+// file and nothing else.
 //
-// errors.Is walks the wrapped-error chain, so a repository that wraps
-// ErrNotFound with extra context still matches here.
+// errors.Is walks the wrapped chain, so a repository that wraps ErrNotFound
+// with extra context still matches.
 
-// writeError translates any error into an HTTP response.
+// classify turns any error into the status and payload the client should see.
 //
-// >>> THIS IS ONE OF YOUR DECISIONS -- see the note I left you. <<<
+// >>> THIS IS ONE OF YOUR DECISIONS -- docs/DECISIONS.md #4. <<<
 //
-// TODO(you): switch on the domain error and pick statuses. A starting point:
+// The `error` field is a STABLE MACHINE CODE clients may branch on, so treat it
+// as part of the contract: renaming "not_found" is a breaking API change, the
+// same as renaming a JSON field.
 //
-//   domain.ErrNotFound                        -> 404
-//   domain.ErrTitleEmpty, ErrTitleTooLong     -> 400
-//   domain.ErrInvalidID                       -> 400
-//   domain.ErrAlreadyComplete, ErrNotCompleted-> 409
-//   anything unrecognised                     -> 500, and log the real error
-//                                                while returning something
-//                                                generic to the client
-func writeError(w nethttp.ResponseWriter, err error) {
-	// TODO(you): remove both lines -- they only keep the imports alive
+// TODO(you): switch on the domain errors. A starting point:
+//
+//	domain.ErrNotFound                          404  "not_found"
+//	domain.ErrTitleEmpty, domain.ErrTitleTooLong 400  "invalid_title"
+//	domain.ErrInvalidID                          400  "invalid_id"
+//	domain.ErrAlreadyComplete                    409  "already_completed"
+//	domain.ErrNotCompleted                       409  "not_completed"
+//	domain.ErrDueDateInPast                      400  "invalid_due_date"
+//	anything else                                500  "internal_error"
+//
+// For the 500 case: LOG the real error server-side and return a generic
+// message. Leaking `pq: relation "todos" does not exist` hands an attacker your
+// schema, and handler_test.go has a test for exactly that.
+func classify(err error) (int, ErrorResponse) {
+	// TODO(you): remove these two lines -- they only keep the imports alive
 	_ = errors.Is
 	_ = domain.ErrNotFound
-	// TODO
+
+	return nethttp.StatusInternalServerError, ErrorResponse{
+		Error:   "internal_error",
+		Message: "an unexpected error occurred",
+	}
 }

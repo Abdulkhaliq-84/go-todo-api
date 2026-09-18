@@ -15,7 +15,9 @@
 # compiler enforces that the code matches the spec.
 
 package: http
-output: ../internal/todo/http/openapi_gen.go
+# Relative to the directory `go generate` runs in, which is the package holding
+# the //go:generate directive -- internal/todo/http.
+output: openapi_gen.go
 
 generate:
   models: true

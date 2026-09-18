@@ -1,92 +1,125 @@
 // Package http adapts HTTP to the application layer.
 //
 // Its entire job is translation, in both directions:
-//   inbound:  JSON body + URL params  ->  app commands/queries
-//   outbound: app DTOs or errors      ->  JSON + status codes
+//   inbound:  a parsed request object  ->  app commands/queries
+//   outbound: app DTOs or errors       ->  typed response objects
 //
-// It imports app. It must NOT import domain directly for business decisions,
-// and it must NEVER import postgres.
+// It imports app. It must NOT import postgres, and it must not contain business
+// rules -- those live in the domain.
 //
-// Package name collides with net/http, so the import below is aliased. Slightly
-// awkward, and entirely normal in Go codebases organised this way.
+// THE SHAPE OF THIS FILE IS DICTATED BY api/openapi.yaml.
+// openapi_gen.go declares StrictServerInterface; the assertion below makes the
+// compiler check that this type satisfies it. Add an endpoint to the spec,
+// regenerate, and this file stops compiling until you implement it. That is the
+// whole point of spec-first: the contract cannot drift from the code.
 package http
 
 import (
-	nethttp "net/http"
+	"context"
 
 	"github.com/Abdulkhaliq-84/go-todo-api/internal/todo/app"
 )
 
-// Handler holds the dependencies every route needs.
+// Server implements the generated StrictServerInterface.
 //
-// In Express you would close over `service` in a route callback; in FastAPI you
-// would Depends() it in. In Go you put it in a struct and hang methods off that
-// struct -- the methods then satisfy http.HandlerFunc. Same idea, no framework.
-type Handler struct {
+// Named Server rather than Handler because the generator already emits a
+// package-level func Handler(ServerInterface) http.Handler.
+//
+// Dependency injection is the struct field -- no container, no decorators.
+// Wiring happens once, by hand, in cmd/api/main.go.
+type Server struct {
 	service *app.Service
 }
 
-func NewHandler(service *app.Service) *Handler {
-	return &Handler{service: service}
+func NewServer(service *app.Service) *Server {
+	return &Server{service: service}
 }
 
-// Every handler has the same signature: func(ResponseWriter, *Request).
-// No return value -- you WRITE the response rather than returning it. That is
-// the biggest surface-level difference from Express/FastAPI, and it means
-// forgetting to return after an error write is a real bug Go will not catch.
+// Compile-time contract check. This single line is what turns a spec change
+// into a build failure instead of a runtime surprise.
+var _ StrictServerInterface = (*Server)(nil)
 
-// Create handles POST /api/v1/todos
+// ---------------------------------------------------------------------------
+// Endpoints
 //
-// TODO(you): decode the body, validate, call service.Create, write 201.
-func (h *Handler) Create(w nethttp.ResponseWriter, r *nethttp.Request) {
-	// TODO
+// Note the signature style: you receive a PARSED, TYPED request and RETURN a
+// typed response. No ResponseWriter, no forgetting to return after writing an
+// error. Much closer to an Express handler doing `return res.json(...)`, and it
+// makes every handler a pure function you can call directly in a test.
+//
+// Path params, query params and the decoded JSON body all arrive already
+// parsed and validated against the spec -- that part is genuinely FastAPI-like,
+// and it is generated rather than reflected at runtime.
+// ---------------------------------------------------------------------------
+
+// ListTodos handles GET /api/v1/todos
+//
+// TODO(you): build an app.ListTodosQuery from request.Params (all pointers --
+// nil means the client omitted it, so apply your defaults), call the service,
+// return ListTodos200JSONResponse{Data: ..., Count: ...}.
+func (s *Server) ListTodos(ctx context.Context, request ListTodosRequestObject) (ListTodosResponseObject, error) {
+	return nil, nil // TODO
 }
 
-// List handles GET /api/v1/todos
+// CreateTodo handles POST /api/v1/todos
 //
-// TODO(you): parse ?completed= &overdue= &limit= &offset= into a ListTodosQuery.
-func (h *Handler) List(w nethttp.ResponseWriter, r *nethttp.Request) {
-	// TODO
+// request.Body is already decoded into *CreateTodoRequest and checked against
+// the spec's constraints. What it has NOT been checked against is your domain
+// rules -- those still run in domain.NewTitle. Two layers of validation with
+// different jobs: shape here, meaning there.
+//
+// TODO(you): map body -> app.CreateTodoCommand, call Create, return
+// CreateTodo201JSONResponse(toTodo(dto)).
+func (s *Server) CreateTodo(ctx context.Context, request CreateTodoRequestObject) (CreateTodoResponseObject, error) {
+	return nil, nil // TODO
 }
 
-// GetByID handles GET /api/v1/todos/{id}
+// GetTodoById handles GET /api/v1/todos/{id}
 //
-// Go 1.22+ gives you r.PathValue("id") from the stdlib router -- no gorilla/mux,
-// no chi needed for this.
+// TODO(you): request.Id is already a parsed UUID. On domain.ErrNotFound return
+// GetTodoById404JSONResponse -- returning the error instead would produce a 500.
+func (s *Server) GetTodoById(ctx context.Context, request GetTodoByIdRequestObject) (GetTodoByIdResponseObject, error) {
+	return nil, nil // TODO
+}
+
+// UpdateTodo handles PATCH /api/v1/todos/{id}
 //
 // TODO(you)
-func (h *Handler) GetByID(w nethttp.ResponseWriter, r *nethttp.Request) {
-	// TODO
+func (s *Server) UpdateTodo(ctx context.Context, request UpdateTodoRequestObject) (UpdateTodoResponseObject, error) {
+	return nil, nil // TODO
 }
 
-// Update handles PATCH /api/v1/todos/{id}
+// DeleteTodo handles DELETE /api/v1/todos/{id}
+//
+// TODO(you): return DeleteTodo204Response{} on success.
+func (s *Server) DeleteTodo(ctx context.Context, request DeleteTodoRequestObject) (DeleteTodoResponseObject, error) {
+	return nil, nil // TODO
+}
+
+// CompleteTodo handles POST /api/v1/todos/{id}/complete
+//
+// The spec promises a 409 here. If you chose idempotent completion in
+// docs/DECISIONS.md #1, that 409 can never happen and the spec is lying --
+// update api/openapi.yaml and regenerate. The contract and the domain rule are
+// the same decision, stated twice.
 //
 // TODO(you)
-func (h *Handler) Update(w nethttp.ResponseWriter, r *nethttp.Request) {
-	// TODO
+func (s *Server) CompleteTodo(ctx context.Context, request CompleteTodoRequestObject) (CompleteTodoResponseObject, error) {
+	return nil, nil // TODO
 }
 
-// Complete handles POST /api/v1/todos/{id}/complete
-//
-// Why a sub-resource verb instead of PATCH {"completed": true}? Because
-// completing is a domain ACTION with its own rules, not a field assignment.
-// The URL reflects the model. Change it if you disagree -- but decide on purpose.
+// ReopenTodo handles POST /api/v1/todos/{id}/reopen
 //
 // TODO(you)
-func (h *Handler) Complete(w nethttp.ResponseWriter, r *nethttp.Request) {
-	// TODO
+func (s *Server) ReopenTodo(ctx context.Context, request ReopenTodoRequestObject) (ReopenTodoResponseObject, error) {
+	return nil, nil // TODO
 }
 
-// Reopen handles POST /api/v1/todos/{id}/reopen
+// GetHealth handles GET /health
 //
-// TODO(you)
-func (h *Handler) Reopen(w nethttp.ResponseWriter, r *nethttp.Request) {
-	// TODO
-}
-
-// Delete handles DELETE /api/v1/todos/{id}
-//
-// TODO(you): 204 No Content on success.
-func (h *Handler) Delete(w nethttp.ResponseWriter, r *nethttp.Request) {
-	// TODO
+// TODO(you): return GetHealth200JSONResponse{Status: "ok"}.
+// Decide whether this should also ping the database -- a health check that
+// reports OK while the DB is unreachable is worse than no health check.
+func (s *Server) GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error) {
+	return nil, nil // TODO
 }

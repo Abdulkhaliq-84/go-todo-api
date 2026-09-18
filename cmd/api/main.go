@@ -30,10 +30,11 @@ func main() {
 	//     defer pool.Close()
 	//  4. repo    := postgres.NewRepository(pool)
 	//     service := app.NewService(repo)
-	//     handler := todohttp.NewHandler(service)
+	//     srv     := todohttp.NewServer(service)
 	//  5. mux := http.NewServeMux()
-	//     todohttp.RegisterRoutes(mux, handler)
-	//     mux.HandleFunc("GET /health", healthHandler)
+	//     todohttp.RegisterRoutes(mux, srv)   // routes come from the spec,
+	//                                         // /health included
+	//     docs.RegisterRoutes(mux)            // /docs and /openapi.yaml
 	//  6. srv := server.New(cfg.Server, mux)
 	//     go srv.Start()
 	//  7. <-ctx.Done()            // blocks until SIGINT/SIGTERM

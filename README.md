@@ -100,12 +100,12 @@ Translates in both directions and does nothing else.
 
 | File | Responsibility |
 |---|---|
-| `handler.go` | One method per endpoint. Decodes, calls the service, writes the response. Holds the service in a struct field — Go's dependency injection. |
-| `router.go` | URL patterns to handler methods, using the stdlib `ServeMux` (Go 1.22+ supports `GET /todos/{id}` natively — no third-party router). |
-| `request.go` | Inbound JSON DTOs with `json` tags and *transport-level* validation only. Business rules stay in the domain. |
-| `response.go` | Outbound JSON DTOs. The public API shape, versioned independently of the domain model. |
-| `errors.go` | **The only file that knows both domain errors and HTTP status codes.** Swap in gRPC tomorrow and this is the one file you rewrite. |
-| `generate.go` | The `//go:generate` directive that regenerates types and the `ServerInterface` from the OpenAPI spec. |
+| `openapi_gen.go` | **Generated — do not edit.** Wire types, `ServerInterface`, `StrictServerInterface` and routing, produced from `api/openapi.yaml` by `make generate`. |
+| `handler.go` | `Server`, which implements the generated `StrictServerInterface`. One method per endpoint, each receiving a parsed request object and returning a typed response. A compile-time assertion ties it to the spec. |
+| `router.go` | Wires the generated routing onto a `ServeMux`. Implemented, not stubbed — the routes come from the spec, so hand-writing them would only create a second place to disagree. |
+| `mapping.go` | `app.TodoDTO` → the generated `Todo` wire type. There are no hand-written request/response structs: the spec owns them. |
+| `errors.go` | **The only file that knows both domain errors and HTTP status codes.** Also owns the stable machine-readable error codes, which are part of the public contract. |
+| `generate.go` | The `//go:generate` directive driving `make generate`. |
 
 ### `internal/platform/` — shared infrastructure
 
@@ -122,7 +122,7 @@ Not about todos. A second bounded context would use all of it unchanged.
 
 | File | Responsibility |
 |---|---|
-| `openapi.yaml` | **Source of truth.** 8 endpoints, 6 schemas. Code is generated from it, so spec/code drift is a compile error. |
+| `openapi.yaml` | **Source of truth.** 8 endpoints, 6 schemas. Code is generated from it, so spec/code drift is a compile error. Note it carries no `readOnly` on response-only schemas — that would force optional pointers on required fields. |
 | `embed.go` | `//go:embed` of the spec, so the binary serves its own contract. |
 | `oapi-codegen.yaml` | Generator config — models, std-http-server, strict-server. |
 | `requests.http` | The same calls for poking at by hand, in VS Code / JetBrains HTTP client format. |
