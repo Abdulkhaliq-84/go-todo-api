@@ -8,17 +8,17 @@ import (
 
 // TodoDTO is the OUTPUT boundary of the application layer.
 //
-// Why not just return *domain.Todo and be done with it?
-//   1. The domain entity's fields are private -- callers literally cannot read
-//      them without going through getters.
-//   2. Returning the entity would let the HTTP layer call todo.Complete(),
-//      mutating the domain from inside a JSON handler. The DTO makes that
-//      impossible: it is inert data.
-//   3. It decouples your API's shape from your model's shape. Rename a domain
-//      field and your JSON contract does not silently break.
+// Why not just return *domain.Todo?
+//  1. The entity's fields are private -- callers cannot read them except
+//     through getters.
+//  2. Returning the entity would let the HTTP layer call todo.Complete() and
+//     mutate the domain from inside a JSON handler. A DTO is inert data.
+//  3. It decouples the API's shape from the model's. Rename a domain field and
+//     the JSON contract does not silently break.
 //
-// Still no json tags here -- those live in internal/todo/http/response.go.
-// This layer does not know it is being serialised, or to what.
+// No json tags here -- those live on the generated wire types in
+// internal/todo/http. This layer does not know it is being serialised, or to
+// what.
 type TodoDTO struct {
 	ID          string
 	Title       string
@@ -32,24 +32,34 @@ type TodoDTO struct {
 
 // toDTO maps a domain entity to its output representation.
 //
-// Takes `now` explicitly rather than calling time.Now()
-// in here. The domain and this mapping stay pure functions of their inputs, so
-// a test can ask "is this overdue as of next Tuesday?" without freezing a clock
-// or sleeping. The service calls time.Now() ONCE per request and threads it
-// down -- which also means every todo in a list is evaluated against the same
-// instant, rather than each against a slightly different one.
+// Takes `now` explicitly rather than calling time.Now() in here, so the domain
+// and this mapping stay pure functions of their inputs. The service calls
+// time.Now() ONCE per request and threads it down -- which also means every
+// todo in a list is judged against the same instant rather than each against a
+// slightly different one.
 //
-// Lowercase = private to package app. Nothing outside can call it, which keeps
-// the mapping direction one-way by construction.
-//
-// TODO(you): read each field off the entity's getters, pass `now` to IsOverdue.
+// Lowercase = private to package app, so mapping can only flow outward.
 func toDTO(t *domain.Todo, now time.Time) TodoDTO {
-	return TodoDTO{} // TODO
+	return TodoDTO{
+		ID:          t.ID().String(),
+		Title:       t.Title().String(),
+		Description: t.Description(),
+		Completed:   t.IsCompleted(),
+		DueDate:     t.DueDate(), // already a defensive copy
+		Overdue:     t.IsOverdue(now),
+		CreatedAt:   t.CreatedAt(),
+		UpdatedAt:   t.UpdatedAt(),
+	}
 }
 
 // toDTOs maps a slice against a single instant.
-//
-// TODO(you)
 func toDTOs(todos []*domain.Todo, now time.Time) []TodoDTO {
-	return nil // TODO
+	// Return an empty slice, never nil: the transport layer serialises this
+	// straight into a JSON array, and a nil slice marshals to `null` rather
+	// than `[]`. Clients doing data.map(...) break on null.
+	dtos := make([]TodoDTO, 0, len(todos))
+	for _, t := range todos {
+		dtos = append(dtos, toDTO(t, now))
+	}
+	return dtos
 }

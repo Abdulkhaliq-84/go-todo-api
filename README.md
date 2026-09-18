@@ -9,7 +9,7 @@ markers where the bodies go.
 | Layer | State |
 |---|---|
 | `domain` | ✅ implemented, 85% covered, no database needed |
-| `app` | scaffolded |
+| `app` | ✅ implemented, 85% covered, no database needed |
 | `postgres` | scaffolded |
 | `http` | scaffolded |
 | `platform` + `main.go` | scaffolded |
