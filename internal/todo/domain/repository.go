@@ -19,6 +19,10 @@ import "context"
 // convention for cancellation and deadlines, and it is how a dropped HTTP
 // connection cancels the Postgres query underneath it.
 type Repository interface {
+	// Save persists a todo, whether it is new or already stored
+	// (docs/DECISIONS.md #3). One method rather than Insert + Update, so the
+	// service never has to track whether an entity is new -- that is a
+	// persistence concern and it stays on this side of the boundary.
 	Save(ctx context.Context, todo *Todo) error
 	FindByID(ctx context.Context, id ID) (*Todo, error)
 	FindAll(ctx context.Context, filter Filter) ([]*Todo, error)

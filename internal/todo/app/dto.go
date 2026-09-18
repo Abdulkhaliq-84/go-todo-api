@@ -32,19 +32,24 @@ type TodoDTO struct {
 
 // toDTO maps a domain entity to its output representation.
 //
+// Takes `now` explicitly (docs/DECISIONS.md #6) rather than calling time.Now()
+// in here. The domain and this mapping stay pure functions of their inputs, so
+// a test can ask "is this overdue as of next Tuesday?" without freezing a clock
+// or sleeping. The service calls time.Now() ONCE per request and threads it
+// down -- which also means every todo in a list is evaluated against the same
+// instant, rather than each against a slightly different one.
+//
 // Lowercase = private to package app. Nothing outside can call it, which keeps
 // the mapping direction one-way by construction.
 //
-// TODO(you): read each field off the entity's getters. Decide what `now` to
-// pass to IsOverdue -- time.Now() is easy but makes tests time-dependent;
-// threading a clock through is testable but more plumbing.
-func toDTO(t *domain.Todo) TodoDTO {
+// TODO(you): read each field off the entity's getters, pass `now` to IsOverdue.
+func toDTO(t *domain.Todo, now time.Time) TodoDTO {
 	return TodoDTO{} // TODO
 }
 
-// toDTOs maps a slice.
+// toDTOs maps a slice against a single instant.
 //
 // TODO(you)
-func toDTOs(todos []*domain.Todo) []TodoDTO {
+func toDTOs(todos []*domain.Todo, now time.Time) []TodoDTO {
 	return nil // TODO
 }

@@ -35,8 +35,18 @@ type DatabaseConfig struct {
 
 // Load reads the environment and returns a Config.
 //
-// >>> THIS IS ONE OF YOUR DECISIONS -- see the note I left you. <<<
-// Fail fast on a missing DATABASE_URL, or fall back to a default?
+// FAIL FAST (docs/DECISIONS.md #5): a missing or unparseable DATABASE_URL is an
+// error, not a cue to fall back to localhost. A production deploy with the
+// variable unset should die immediately and visibly. The alternative failure --
+// a service that starts, reports healthy, and is quietly talking to the wrong
+// database, or to nothing -- is far more expensive to diagnose.
+//
+// Everything else gets a sensible default. Ports and timeouts have obviously
+// right values; a database URL does not.
+//
+// Return an error rather than calling log.Fatal or panicking. Load is a
+// library function: the DECISION to exit belongs to main, which is the only
+// place that should own the process lifecycle.
 //
 // TODO(you): read the env vars, apply defaults, validate, return.
 func Load() (*Config, error) {

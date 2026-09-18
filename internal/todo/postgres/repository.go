@@ -33,10 +33,19 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-// Save inserts or updates.
+// Save upserts (docs/DECISIONS.md #3).
 //
-// >>> THIS IS ONE OF YOUR DECISIONS -- see the note I left you. <<<
-// One Save doing INSERT ... ON CONFLICT DO UPDATE, or separate Insert/Update?
+//	INSERT INTO todos (...) VALUES ($1, ...)
+//	ON CONFLICT (id) DO UPDATE SET
+//	    title = EXCLUDED.title, ... , updated_at = EXCLUDED.updated_at
+//
+// The trade accepted with this choice: inserting an ID that already exists
+// silently overwrites rather than failing loudly. Acceptable here because IDs
+// are UUIDs minted by the domain, so a collision means a bug so severe that a
+// unique-violation error would not be the thing that saves you.
+//
+// Do NOT include created_at in the DO UPDATE SET list -- an update must not
+// rewrite the creation timestamp.
 //
 // TODO(you): write the SQL, pass todo's getters as parameters.
 // Use $1, $2 placeholders -- never string concatenation, that is SQL injection.

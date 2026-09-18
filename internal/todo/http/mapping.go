@@ -20,10 +20,28 @@ import (
 
 // toTodo converts an application DTO into the generated wire type.
 //
+// DueDate is nullable.Nullable[time.Time], not *time.Time, because the spec
+// declares it optional AND nullable. Build it with
+// nullable.NewNullableWithValue(t) or nullable.NewNullNullable().
+//
 // TODO(you): parse dto.ID into a uuid.UUID (openapi_types.UUID is an alias for
 // it) and copy the rest across.
 func toTodo(dto app.TodoDTO) Todo {
 	return Todo{} // TODO
+}
+
+// toUpdateCommand resolves the wire format's THREE states into the application
+// layer's two fields. This function is the entire reason nullable-type is
+// enabled -- it is where "the client did not mention due_date" and "the client
+// asked to clear due_date" stop being the same thing.
+//
+//	body.DueDate.IsSpecified() == false  -> absent        -> ClearDueDate=false, DueDate=nil
+//	body.DueDate.IsNull()      == true   -> explicit null -> ClearDueDate=true,  DueDate=nil
+//	otherwise                            -> a value       -> ClearDueDate=false, DueDate=&v
+//
+// TODO(you): implement the three-way resolution.
+func toUpdateCommand(body UpdateTodoRequest) app.UpdateTodoCommand {
+	return app.UpdateTodoCommand{} // TODO
 }
 
 // toTodos maps a slice.

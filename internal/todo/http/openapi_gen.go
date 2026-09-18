@@ -14,15 +14,16 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/oapi-codegen/nullable"
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // CreateTodoRequest defines model for CreateTodoRequest.
 type CreateTodoRequest struct {
-	Description *string    `json:"description,omitempty"`
-	DueDate     *time.Time `json:"due_date,omitempty"`
-	Title       string     `json:"title"`
+	Description *string                      `json:"description,omitempty"`
+	DueDate     nullable.Nullable[time.Time] `json:"due_date,omitempty"`
+	Title       string                       `json:"title"`
 }
 
 // ErrorResponse defines model for ErrorResponse.
@@ -50,9 +51,9 @@ type Todo struct {
 	CreatedAt time.Time `json:"created_at"`
 
 	// Description Examples: Focus on implicit satisfaction
-	Description string             `json:"description"`
-	DueDate     *time.Time         `json:"due_date,omitempty"`
-	Id          openapi_types.UUID `json:"id"`
+	Description string                       `json:"description"`
+	DueDate     nullable.Nullable[time.Time] `json:"due_date,omitempty"`
+	Id          openapi_types.UUID           `json:"id"`
 
 	// Overdue Derived from due_date and the current time. Never stored.
 	Overdue bool `json:"overdue"`
@@ -71,9 +72,9 @@ type TodoListResponse struct {
 
 // UpdateTodoRequest Every field optional. Omitted means unchanged; null means cleared.
 type UpdateTodoRequest struct {
-	Description *string    `json:"description,omitempty"`
-	DueDate     *time.Time `json:"due_date,omitempty"`
-	Title       *string    `json:"title,omitempty"`
+	Description *string                      `json:"description,omitempty"`
+	DueDate     nullable.Nullable[time.Time] `json:"due_date,omitempty"`
+	Title       *string                      `json:"title,omitempty"`
 }
 
 // TodoId defines model for TodoId.

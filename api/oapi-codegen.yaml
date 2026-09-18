@@ -28,5 +28,16 @@ generate:
 output-options:
   # Skip pruning so every schema stays available even before handlers use it.
   skip-prune: true
+
+  # Maps a field that is BOTH optional and nullable to nullable.Nullable[T],
+  # which distinguishes three states a plain pointer cannot:
+  #     absent  -> client did not send the field  -> leave it alone
+  #     null    -> client sent null               -> clear it
+  #     value   -> set it
+  # This is what makes correct PATCH semantics expressible. A *time.Time would
+  # collapse "absent" and "null" into nil, so a PATCH that omitted due_date
+  # would silently clear it. TypeScript has the same problem and solves it the
+  # same way -- `T | null | undefined` rather than `T | null`.
+  nullable-type: true
   # Generated code is not yours to edit; the header says so loudly.
   user-templates: {}
