@@ -12,6 +12,10 @@ todo-api
 coverage.html
 
 # Editors / OS
-.vscode/
+# .vscode/ is ignored EXCEPT the two files worth sharing: build-tag config so
+# tagged tests are analysed, and the extension recommendations.
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 .idea/
 .DS_Store

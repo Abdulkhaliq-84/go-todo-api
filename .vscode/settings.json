@@ -1,0 +1,25 @@
+{
+  // Build tags: without this, Cursor greys out repository_test.go and
+  // test/e2e/api_test.go as "excluded by build constraints" and gives you no
+  // autocomplete in them. This tells gopls to analyse them too.
+  "gopls": {
+    "buildFlags": ["-tags=integration,e2e"],
+    "ui.semanticTokens": true,
+    "ui.diagnostic.staticcheck": true
+  },
+
+  // goimports formats AND removes unused imports on save -- which, given that
+  // unused imports are a hard compile error in Go, saves real friction.
+  "editor.formatOnSave": true,
+  "[go]": {
+    "editor.defaultFormatter": "golang.go",
+    "editor.codeActionsOnSave": { "source.organizeImports": "explicit" }
+  },
+
+  "go.useLanguageServer": true,
+  "go.lintTool": "staticcheck",
+  "go.testFlags": ["-v"],
+  "go.testTimeout": "60s",
+
+  "files.exclude": { "**/.DS_Store": true }
+}
