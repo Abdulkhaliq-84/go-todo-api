@@ -2,17 +2,24 @@
 
 A to-do REST API in Go, structured with Domain-Driven Design and backed by PostgreSQL.
 
-**Status: in progress.** The domain layer is implemented and tested; the
-remaining layers are scaffolded with their contracts written and `TODO`
-markers where the bodies go.
+**Status: working.** All eight endpoints are implemented and covered by 121
+tests, from pure domain units up to full end-to-end runs against PostgreSQL.
 
-| Layer | State |
-|---|---|
-| `domain` | ✅ implemented, 85% covered, no database needed |
-| `app` | ✅ implemented, 85% covered, no database needed |
-| `postgres` | ✅ implemented, 14 integration tests against real Postgres |
-| `http` | ✅ implemented, 26 tests via `httptest`, no database |
-| `platform` + `main.go` | ✅ implemented, server runs — `make run` |
+```bash
+make db-local && make run     # → http://localhost:8080/docs
+```
+
+| Layer | Tests | Needs a database |
+|---|---|---|
+| `domain` | 23 | no |
+| `app` | 29 | no |
+| `http` | 26 | no |
+| `platform/config` | 9 | no |
+| `postgres` | 14 | yes — `//go:build integration` |
+| `test/e2e` | 5 | yes — `//go:build e2e` |
+
+`make test-unit` runs the first four in about a second. `make test-all` runs
+everything, one package at a time.
 
 This document is the plan: what every file is for, and why it sits where it does.
 

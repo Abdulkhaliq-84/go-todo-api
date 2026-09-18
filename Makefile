@@ -39,8 +39,12 @@ test-integration: ## Real Postgres required (make db-up OR make db-local)
 test-e2e: ## Whole app against a real database
 	go test -tags=e2e ./test/e2e/... -v
 
-test-all: ## Everything
-	go test -tags="integration e2e" ./... -v
+test-all: ## Everything, database packages serialised
+	# -p 1 runs one package at a time. Go parallelises packages by default, and
+	# the postgres and e2e suites share one todos table: without this, one can
+	# TRUNCATE while the other is mid-test. It passes most of the time, which is
+	# the worst kind of bug to leave in a test suite.
+	go test -tags="integration e2e" -p 1 ./... -v
 
 test-race: ## Unit tests under the race detector
 	go test -race ./...
