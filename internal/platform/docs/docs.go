@@ -34,6 +34,7 @@ func RegisterRoutes(mux *http.ServeMux) {
 //
 // TODO(you): write api.Spec with Content-Type application/yaml.
 func specHandler(w http.ResponseWriter, r *http.Request) {
+	_ = api.Spec // TODO(you): remove this line -- it only keeps the import alive
 	// TODO
 }
 

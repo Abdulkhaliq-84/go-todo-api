@@ -29,6 +29,8 @@ import (
 //                                                while returning something
 //                                                generic to the client
 func writeError(w nethttp.ResponseWriter, err error) {
-	_ = errors.Is // TODO: remove once you use it
+	// TODO(you): remove both lines -- they only keep the imports alive
+	_ = errors.Is
+	_ = domain.ErrNotFound
 	// TODO
 }
