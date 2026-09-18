@@ -35,7 +35,7 @@ type DatabaseConfig struct {
 
 // Load reads the environment and returns a Config.
 //
-// FAIL FAST (docs/DECISIONS.md #5): a missing or unparseable DATABASE_URL is an
+// FAIL FAST: a missing or unparseable DATABASE_URL is an
 // error, not a cue to fall back to localhost. A production deploy with the
 // variable unset should die immediately and visibly. The alternative failure --
 // a service that starts, reports healthy, and is quietly talking to the wrong

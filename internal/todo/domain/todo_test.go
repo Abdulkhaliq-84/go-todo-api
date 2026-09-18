@@ -73,7 +73,7 @@ func TestNew_AcceptsPastDueDate(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// State machine -- the strict rule from docs/DECISIONS.md #1
+// State machine -- strict: a transition from the wrong state is an error
 // ---------------------------------------------------------------------------
 
 func TestTodo_Complete(t *testing.T) {
@@ -179,7 +179,7 @@ func TestTodo_Reopen_KeepsDueDate(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Derived state -- docs/DECISIONS.md #7
+// Derived state -- a completed todo is never overdue
 // ---------------------------------------------------------------------------
 
 func TestTodo_IsOverdue(t *testing.T) {

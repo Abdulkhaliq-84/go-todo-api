@@ -30,7 +30,7 @@ type Todo struct {
 // TIME
 //
 // Every method that reads or writes a timestamp takes `now` as a parameter.
-// Nothing in this package calls time.Now() (docs/DECISIONS.md #6).
+// Nothing in this package calls time.Now().
 //
 // The service calls time.Now() once per request and threads it down. Three
 // things fall out of that:
@@ -102,7 +102,7 @@ func Reconstitute(
 //	 (completed=false)  (=true)      (=true)              (=false)
 //
 // Both transitions are STRICT: calling one from the wrong state is an error,
-// not a silent no-op (docs/DECISIONS.md #1). On the error path NOTHING changes,
+// not a silent no-op. On the error path NOTHING changes,
 // updatedAt included -- a failed transition that still bumped a timestamp would
 // be a partial mutation, and preventing those is what an aggregate is for.
 // ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ func (t *Todo) Reschedule(dueDate *time.Time, now time.Time) error {
 
 // IsOverdue reports whether this todo needs attention as of `now`.
 //
-// A COMPLETED todo is never overdue (docs/DECISIONS.md #7). "Overdue" here
+// A COMPLETED todo is never overdue. "Overdue" here
 // means outstanding and past its deadline, so ?overdue=true returns exactly the
 // list a user should act on, with no client-side filtering.
 func (t *Todo) IsOverdue(now time.Time) bool {

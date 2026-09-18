@@ -98,10 +98,10 @@ func (s *Server) DeleteTodo(ctx context.Context, request DeleteTodoRequestObject
 
 // CompleteTodo handles POST /api/v1/todos/{id}/complete
 //
-// The spec promises a 409 here. If you chose idempotent completion in
-// docs/DECISIONS.md #1, that 409 can never happen and the spec is lying --
-// update api/openapi.yaml and regenerate. The contract and the domain rule are
-// the same decision, stated twice.
+// The spec promises a 409 here, and the domain delivers one: Complete on an
+// already-completed todo returns ErrAlreadyComplete. The contract and the
+// domain rule are the same decision, stated twice -- if one ever changes, the
+// other has to change with it.
 //
 // TODO(you)
 func (s *Server) CompleteTodo(ctx context.Context, request CompleteTodoRequestObject) (CompleteTodoResponseObject, error) {

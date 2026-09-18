@@ -20,7 +20,7 @@ import "context"
 // connection cancels the Postgres query underneath it.
 type Repository interface {
 	// Save persists a todo, whether it is new or already stored
-	// (docs/DECISIONS.md #3). One method rather than Insert + Update, so the
+	// One method rather than Insert + Update, so the
 	// service never has to track whether an entity is new -- that is a
 	// persistence concern and it stays on this side of the boundary.
 	Save(ctx context.Context, todo *Todo) error

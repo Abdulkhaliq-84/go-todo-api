@@ -17,7 +17,10 @@ import (
 
 // classify turns any error into the status and payload the client should see.
 //
-// >>> THIS IS ONE OF YOUR DECISIONS -- docs/DECISIONS.md #4. <<<
+// Codes are COARSE: invalid_title covers both the empty and the too-long case,
+// and the `message` carries the specifics for a human. Fewer strings frozen
+// into the contract forever, at the cost of a client not being able to tell the
+// two title failures apart without reading prose.
 //
 // The `error` field is a STABLE MACHINE CODE clients may branch on, so treat it
 // as part of the contract: renaming "not_found" is a breaking API change, the
@@ -30,7 +33,6 @@ import (
 //	domain.ErrInvalidID                          400  "invalid_id"
 //	domain.ErrAlreadyComplete                    409  "already_completed"
 //	domain.ErrNotCompleted                       409  "not_completed"
-//	domain.ErrDueDateInPast                      400  "invalid_due_date"
 //	anything else                                500  "internal_error"
 //
 // For the 500 case: LOG the real error server-side and return a generic

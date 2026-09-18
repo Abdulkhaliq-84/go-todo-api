@@ -21,7 +21,7 @@ type CreateTodoCommand struct {
 
 // UpdateTodoCommand is the input to Service.Update.
 //
-// PATCH semantics (docs/DECISIONS.md #2): only the fields the client actually
+// PATCH semantics: only the fields the client actually
 // sent are changed. Pointers encode that:
 //
 //	nil            -> absent, leave it alone

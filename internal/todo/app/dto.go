@@ -32,7 +32,7 @@ type TodoDTO struct {
 
 // toDTO maps a domain entity to its output representation.
 //
-// Takes `now` explicitly (docs/DECISIONS.md #6) rather than calling time.Now()
+// Takes `now` explicitly rather than calling time.Now()
 // in here. The domain and this mapping stay pure functions of their inputs, so
 // a test can ask "is this overdue as of next Tuesday?" without freezing a clock
 // or sleeping. The service calls time.Now() ONCE per request and threads it

@@ -33,7 +33,7 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-// Save upserts (docs/DECISIONS.md #3).
+// Save upserts.
 //
 //	INSERT INTO todos (...) VALUES ($1, ...)
 //	ON CONFLICT (id) DO UPDATE SET

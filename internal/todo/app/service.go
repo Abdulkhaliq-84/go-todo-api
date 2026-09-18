@@ -71,9 +71,9 @@ func (s *Service) List(ctx context.Context, q ListTodosQuery) ([]TodoDTO, error)
 
 // Update changes a todo's editable fields.
 //
-// >>> THIS IS ONE OF YOUR DECISIONS -- see the note I left you. <<<
-// The shape of this method depends on whether you want PUT (full replace) or
-// PATCH (partial update) semantics.
+// PATCH semantics: only the fields the client actually sent are changed.
+// cmd.Title and cmd.Description are nil when absent; cmd.ClearDueDate says
+// "the client explicitly asked to clear it", which nil alone cannot express.
 //
 // TODO(you)
 func (s *Service) Update(ctx context.Context, id string, cmd UpdateTodoCommand) (TodoDTO, error) {

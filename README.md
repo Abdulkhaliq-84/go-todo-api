@@ -189,7 +189,21 @@ Innermost first. Each layer is fully testable the moment it's finished.
 5. `http/` — the thin translation layer
 6. `cmd/api/main.go` — wire it together last
 
+## Design decisions
+
+Settled, and each one stated at the site it affects:
+
+| Rule | Where it lives |
+|---|---|
+| `Complete`/`Reopen` are strict — wrong state is an error, and nothing mutates | `domain/todo.go` |
+| PATCH semantics, with an explicit `ClearDueDate` flag | `app/commands.go` |
+| One `Save()` doing an upsert | `postgres/repository.go` |
+| Coarse error codes; `message` carries the detail | `http/errors.go` |
+| Config fails fast on a missing `DATABASE_URL` | `platform/config/config.go` |
+| `now` is passed in; the domain never calls `time.Now()` | `domain/todo.go` |
+| A completed todo is never overdue | `domain/todo.go` |
+| Past due dates are allowed | `domain/errors.go` |
+
 ## Further reading
 
-- [docs/DECISIONS.md](docs/DECISIONS.md) — six design decisions left open on purpose
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — setup, commands, and the codegen workflow
