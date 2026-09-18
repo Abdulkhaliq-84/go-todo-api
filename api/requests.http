@@ -1,0 +1,77 @@
+### Manual API requests.
+###
+### Works with the REST Client extension in VS Code, or JetBrains' built-in
+### HTTP client. Committed to the repo so the requests live alongside the code
+### and change with it -- unlike a Postman collection sitting in someone's
+### account.
+###
+### Automated tests live in test/e2e/. This file is for poking at things by hand.
+
+@baseUrl = http://localhost:8080/api/v1
+@contentType = application/json
+
+### Health check
+GET http://localhost:8080/health
+
+### Create a todo
+# @name createTodo
+POST {{baseUrl}}/todos
+Content-Type: {{contentType}}
+
+{
+  "title": "Learn Go interfaces",
+  "description": "Specifically implicit satisfaction and the empty interface",
+  "due_date": "2026-10-01T12:00:00Z"
+}
+
+### Capture the id from the response above
+@todoId = {{createTodo.response.body.id}}
+
+### List all todos
+GET {{baseUrl}}/todos
+
+### List only completed
+GET {{baseUrl}}/todos?completed=true
+
+### List overdue, paginated
+GET {{baseUrl}}/todos?overdue=true&limit=10&offset=0
+
+### Get one todo
+GET {{baseUrl}}/todos/{{todoId}}
+
+### Update a todo
+PATCH {{baseUrl}}/todos/{{todoId}}
+Content-Type: {{contentType}}
+
+{
+  "title": "Learn Go interfaces properly"
+}
+
+### Complete it
+POST {{baseUrl}}/todos/{{todoId}}/complete
+
+### Reopen it
+POST {{baseUrl}}/todos/{{todoId}}/reopen
+
+### Delete it
+DELETE {{baseUrl}}/todos/{{todoId}}
+
+### --- Error cases, worth checking by hand ---
+
+### Empty title -> expect 400
+POST {{baseUrl}}/todos
+Content-Type: {{contentType}}
+
+{ "title": "" }
+
+### Malformed JSON -> expect 400, never 500
+POST {{baseUrl}}/todos
+Content-Type: {{contentType}}
+
+{ "title":
+
+### Unknown id -> expect 404
+GET {{baseUrl}}/todos/00000000-0000-0000-0000-000000000000
+
+### Malformed id -> expect 400
+GET {{baseUrl}}/todos/not-a-uuid

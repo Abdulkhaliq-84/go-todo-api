@@ -1,4 +1,4 @@
-.PHONY: help run build test test-cover lint fmt vet tidy db-up db-down migrate-up migrate-down
+.PHONY: help run build test test-unit test-integration test-e2e test-all test-cover test-race lint fmt vet tidy db-up db-down migrate-up migrate-down
 
 DB_URL ?= postgres://postgres:postgres@localhost:5432/todos?sslmode=disable
 
@@ -11,10 +11,28 @@ run: ## Run the API
 build: ## Compile to bin/todo-api
 	go build -o bin/todo-api ./cmd/api
 
-test: ## Run all tests
+# --- Testing pyramid ---------------------------------------------------------
+# Unit tests run on every save. Integration and e2e are gated behind build tags
+# so they only run when you ask, and never slow down the inner loop.
+
+test: test-unit ## Alias for test-unit
+
+test-unit: ## Fast tests: domain, app, http. No database required.
 	go test ./... -v
 
-test-cover: ## Run tests with a coverage report
+test-integration: ## Real Postgres required (make db-up first)
+	go test -tags=integration ./internal/todo/postgres/... -v
+
+test-e2e: ## Whole app against a real database
+	go test -tags=e2e ./test/e2e/... -v
+
+test-all: ## Everything
+	go test -tags="integration e2e" ./... -v
+
+test-race: ## Unit tests under the race detector
+	go test -race ./...
+
+test-cover: ## Coverage report -> coverage.html
 	go test ./... -coverprofile=coverage.out
 	go tool cover -html=coverage.out -o coverage.html
 
