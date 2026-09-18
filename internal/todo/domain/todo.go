@@ -62,18 +62,64 @@ func Reconstitute(
 // Behaviour -- the business rules live HERE, not in the service, not in the handler
 // ---------------------------------------------------------------------------
 
-// Complete marks the todo done.
+// ---------------------------------------------------------------------------
+// STATE MACHINE
 //
-// >>> THIS IS ONE OF YOUR DECISIONS -- see the note I left you. <<<
+// A Todo has exactly two states and two legal transitions:
 //
-// TODO(you): decide and implement the state transition rules.
+//	        Complete()                  Reopen()
+//	 ACTIVE ──────────▶ COMPLETED   COMPLETED ──────────▶ ACTIVE
+//	 (completed=false)  (=true)      (=true)              (=false)
+//
+// Both transitions are STRICT: calling one from the wrong state is an error,
+// not a silent no-op. Decided deliberately -- see docs/DECISIONS.md #1.
+//
+// Consequences that ripple outward, all of them already in place:
+//   - api/openapi.yaml promises 409 on both endpoints
+//   - http/errors.go maps ErrAlreadyComplete / ErrNotCompleted to 409
+//   - app/service.go must let those errors propagate UNWRAPPED, or errors.Is
+//     stops matching and the client silently starts receiving 500s
+// ---------------------------------------------------------------------------
+
+// Complete transitions the todo from ACTIVE to COMPLETED.
+//
+// Contract:
+//
+//	Precondition   t.completed == false
+//	Postcondition  t.completed == true, t.updatedAt refreshed
+//	Error          ErrAlreadyComplete if already completed
+//
+// On the error path NOTHING may change -- not completed, and not updatedAt.
+// A failed transition that still bumped a timestamp would be a partial
+// mutation, and the aggregate's job is to make those impossible.
+//
+// Note the due date is irrelevant here. An overdue todo can still be completed;
+// lateness is an observation about time, never a permission check.
+//
+// TODO(you): implement to this contract.
 func (t *Todo) Complete() error {
 	return nil // TODO
 }
 
-// Reopen moves a completed todo back to active.
+// Reopen transitions the todo from COMPLETED back to ACTIVE.
 //
-// TODO(you): mirror whatever rule you chose in Complete().
+// Contract -- the exact mirror of Complete:
+//
+//	Precondition   t.completed == true
+//	Postcondition  t.completed == false, t.updatedAt refreshed
+//	Error          ErrNotCompleted if it was never completed
+//
+// The mirroring matters. If Complete is strict and Reopen is forgiving, the two
+// halves of the state machine disagree, and which half a bug lands in becomes
+// a coin flip.
+//
+// Deliberately NOT part of this contract: reopening does not touch dueDate. A
+// todo reopened after its deadline is immediately overdue again, which is
+// truthful. Clearing the date to be kind would be the domain quietly inventing
+// a rule nobody asked for -- if rescheduling is wanted, the caller calls
+// Reschedule, visibly.
+//
+// TODO(you): implement to this contract.
 func (t *Todo) Reopen() error {
 	return nil // TODO
 }

@@ -6,16 +6,48 @@ is typing.
 
 ---
 
-## 1. Completion state transitions — `internal/todo/domain/todo.go`
+## 1. Completion state transitions — DECIDED: strict
 
-`Complete()` on an already-completed todo: error, or silent no-op?
+`Complete()` on an already-completed todo returns `ErrAlreadyComplete`.
+`Reopen()` on an active todo returns `ErrNotCompleted`. Neither is a no-op.
 
-- **Error (`ErrAlreadyComplete`)** — strict. The caller learns something
-  unexpected happened. Costs you a 409 path in the HTTP layer.
-- **Idempotent no-op** — forgiving. Double-clicking a checkbox does not produce
-  an error dialog. Matches how HTTP thinks about idempotency.
+```
+        Complete()                  Reopen()
+ ACTIVE ──────────▶ COMPLETED   COMPLETED ──────────▶ ACTIVE
+```
 
-Whatever you choose, `Reopen()` must mirror it.
+**Why strict:**
+
+1. `api/openapi.yaml` already promises `409` on both endpoints. Idempotent
+   completion makes that response unreachable and the spec untrue — and the
+   point of spec-first is that it cannot be.
+2. An aggregate exists to refuse invalid transitions. Accepting one silently
+   moves the rule into the category of things nothing enforces.
+3. It exercises the whole architecture: a domain error propagates untouched
+   through the service and is mapped to a status in exactly one file. An
+   idempotent version never travels that path, so the layering is never tested.
+
+**Rejected alternative — idempotent no-op.** The argument for it is the
+double-clicked checkbox. That is a client-side state problem: disable the
+button, or only call `complete` when `completed == false`. Weakening a domain
+invariant to compensate for UI state is the wrong direction of fix.
+
+**Consequences, all already in place:**
+
+| Where | What |
+|---|---|
+| `domain/errors.go` | `ErrAlreadyComplete`, `ErrNotCompleted` exist |
+| `app/service.go` | Must propagate them **unwrapped**, or `errors.Is` stops matching and clients get 500s |
+| `http/errors.go` | Both map to `409` |
+| `api/openapi.yaml` | `409` documented on complete and reopen — no change needed |
+
+**Deliberately excluded from the rule:**
+
+- Due date does not gate completion. An overdue todo can still be completed;
+  lateness is an observation, not a permission.
+- Reopening does not clear the due date. A todo reopened past its deadline is
+  immediately overdue again, which is truthful. Clearing it would be the domain
+  inventing a rule nobody asked for — `Reschedule` exists for that, visibly.
 
 ---
 

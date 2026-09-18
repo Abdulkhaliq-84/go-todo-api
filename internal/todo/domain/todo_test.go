@@ -36,11 +36,12 @@ func TestNew(t *testing.T) {
 	//   - has createdAt == updatedAt
 }
 
-// TestTodo_Complete is where YOUR design decision gets pinned down.
+// TestTodo_Complete pins down the STRICT state machine (docs/DECISIONS.md #1).
 //
-// Write the cases for the behaviour you chose in docs/DECISIONS.md #1, then
-// make them pass. Whichever you picked, the test is the thing that stops the
-// rule from quietly changing later.
+// The table below is the contract in executable form. It is what stops the rule
+// from quietly softening later -- someone "fixing" a 409 by making Complete
+// idempotent has to delete a test case to do it, which is a visible act in a
+// diff rather than a silent one.
 func TestTodo_Complete(t *testing.T) {
 	t.Skip("TODO(you): remove once Complete() is implemented")
 
@@ -50,7 +51,7 @@ func TestTodo_Complete(t *testing.T) {
 		wantErr   error // nil, or domain.ErrAlreadyComplete -- depends on your choice
 	}{
 		{"completing an active todo", false, nil},
-		{"completing an already-completed todo", true, domain.ErrAlreadyComplete}, // <- change if you chose idempotent
+		{"completing an already-completed todo", true, domain.ErrAlreadyComplete},
 	}
 
 	for _, tt := range tests {
@@ -59,11 +60,19 @@ func TestTodo_Complete(t *testing.T) {
 			_ = errors.Is
 			// TODO(you): build a todo in the starting state, call Complete(),
 			// assert on the error and on IsCompleted().
+			//
+			// On the error case also assert UpdatedAt did NOT move. A failed
+			// transition must change nothing at all -- that is the half of the
+			// contract people forget to test, and the half that lets partial
+			// mutations creep in.
 		})
 	}
 }
 
-// TODO(you): TestTodo_Reopen -- must mirror Complete's rule exactly.
+// TODO(you): TestTodo_Reopen -- the exact mirror:
+//
+//	{"reopening a completed todo", true,  nil}
+//	{"reopening an active todo",   false, domain.ErrNotCompleted}
 
 func TestTodo_IsOverdue(t *testing.T) {
 	t.Skip("TODO(you): remove once IsOverdue is implemented")
@@ -77,6 +86,10 @@ func TestTodo_IsOverdue(t *testing.T) {
 	//   - no due date        -> never overdue
 	//   - due in the future  -> not overdue
 	//   - due in the past    -> overdue
-	//   - due in the past but already completed -> ??? (your call: is a
+	//   - due in the past but already completed -> ??? (still open: is a
 	//     finished task still "overdue"? Decide, then encode it here.)
+	//
+	// Note this is a SEPARATE question from the completion rules. The due date
+	// does not gate Complete() -- an overdue todo can still be completed. What
+	// is undecided is only whether IsOverdue keeps reporting true afterwards.
 }
